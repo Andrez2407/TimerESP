@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Tiempos</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f8fa;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+    }
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    form input {
+      flex: 1 1 120px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      text-align: center;
+    }
+    th {
+      background: #007bff;
+      color: white;
+    }
+    tr:hover {
+      background: #f0f0f0;
+    }
+    .actions button {
+      background: #dc3545;
+      margin: 0 3px;
+    }
+    .actions button.edit {
+      background: #28a745;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Gestión de Tiempos</h1>
+
+  <form id="tiempoForm" onsubmit="guardarTiempo(event)">
+    <input type="text" id="nombre" placeholder="Nombre" required>
+    <input type="number" id="s1" placeholder="S1" step="any" required>
+    <input type="number" id="s2" placeholder="S2" step="any" required>
+    <input type="number" id="s3" placeholder="S3" step="any" required>
+    <button type="submit" id="btnGuardar">Agregar</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>S1</th>
+        <th>S2</th>
+        <th>S3</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tablaDatos"></tbody>
+  </table>
+
+  <script>
+    let editando = false;
+
+    async function cargarDatos() {
+  try {
+    const res = await fetch('/api/get');
+    const datos = await res.json();
+    console.log(datos);
+
+    if (!Array.isArray(datos)) {
+      console.warn("Respuesta inesperada de /api/get:", datos);
+      mostrarTabla([]);
+      return;
+    }
+
+    mostrarTabla(datos);
+  } catch (err) {
+    console.error("Error al cargar datos:", err);
+    mostrarTabla([]);
+  }
+}
+
+function mostrarTabla(datos) {
+  const tbody = document.getElementById('tablaDatos');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (!Array.isArray(datos) || datos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5">Sin datos disponibles</td></tr>';
+    return;
+  }
+
+  datos.forEach(t => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${t.nombre}</td>
+      <td>${t.s1}</td>
+      <td>${t.s2}</td>
+      <td>${t.s3}</td>
+      <td class="actions">
+        <button class="edit" onclick="editar('${t.nombre}', ${t.s1}, ${t.s2}, ${t.s3})">Editar</button>
+        <button onclick="eliminar('${t.nombre}')">Eliminar</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+
+    async function guardarTiempo(e) {
+      e.preventDefault();
+      const nombre = document.getElementById('nombre').value.trim();
+      const s1 = parseFloat(document.getElementById('s1').value);
+      const s2 = parseFloat(document.getElementById('s2').value);
+      const s3 = parseFloat(document.getElementById('s3').value);
+      const final = s1 + s2 + s3
+
+      if (!nombre) return alert('Nombre obligatorio');
+
+      const obj = { nombre, s1, s2, s3, final};
+      const url = editando ? '/api/edit' : '/api/add';
+
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(obj)
+      });
+
+      limpiarFormulario();
+      cargarDatos();
+    }
+
+    function editar(nombre, s1, s2, s3) {
+      document.getElementById('nombre').value = nombre;
+      document.getElementById('s1').value = s1;
+      document.getElementById('s2').value = s2;
+      document.getElementById('s3').value = s3;
+      document.getElementById('nombre').readOnly = true;
+      document.getElementById('btnGuardar').textContent = 'Guardar cambios';
+      editando = true;
+    }
+
+    async function eliminar(nombre) {
+      if (!confirm(`¿Eliminar el tiempo "${nombre}"?`)) return;
+      await fetch(`/api/delete?nombre=${encodeURIComponent(nombre)}`);
+      cargarDatos();
+    }
+
+    function limpiarFormulario() {
+      document.getElementById('tiempoForm').reset();
+      document.getElementById('nombre').readOnly = false;
+      document.getElementById('btnGuardar').textContent = 'Agregar';
+      editando = false;
+    }
+
+    cargarDatos();
+  </script>
+</body>
+</html>
